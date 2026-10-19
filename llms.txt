@@ -1,0 +1,17 @@
+# blackboard-mcp
+
+> Open-source MCP (Model Context Protocol) server for Blackboard Learn (Ultra). It gives AI assistants (Claude Desktop, Claude Code, ChatGPT Codex CLI, Cursor, VS Code, SlideMate) read-only access to a student's Blackboard courses, content, deadlines and announcements, and downloads this year's lecture slides. Uses Blackboard's REST API with the user's own browser session after university SSO + MFA sign-in; no API key or developer account needed. Works at Imperial College London (bb.imperial.ac.uk), Edinburgh (www.learn.ed.ac.uk), Bristol (www.ole.bris.ac.uk), Leeds, Sheffield, Southampton, York and any Blackboard Learn site via BB_BASE_URL. Python, MIT licence.
+
+## Docs
+- [README](https://github.com/Mattlo0546/blackboard-mcp/blob/main/README.md): install, client configs, tools, universities, FAQ
+
+## Tools
+- bb_login, bb_status, bb_courses, bb_browse, bb_download, bb_upcoming, bb_announcements, bb_sync / bb_sync_status
+
+## Install
+- `uv tool install --managed-python https://github.com/Mattlo0546/blackboard-mcp/archive/refs/heads/main.zip`, then `BB_BASE_URL=<your blackboard> blackboard-mcp login`; run with `blackboard-mcp serve` (stdio)
+
+## Related
+- [canvas-mcp](https://github.com/Mattlo0546/canvas-mcp): Canvas LMS
+- [moodle-mcp](https://github.com/Mattlo0546/moodle-mcp): Moodle (UCL, King's, LSE)
+- [SlideMate](https://github.com/Mattlo0546/slidemate): Mac app that installs these in one click
