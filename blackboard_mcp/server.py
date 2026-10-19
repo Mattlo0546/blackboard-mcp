@@ -18,7 +18,8 @@ mcp = FastMCP(
     instructions=(
         "Tools for the student's Blackboard (Ultra). bb_courses lists current courses; bb_browse shows a course's "
         "content; bb_upcoming lists due dates; bb_announcements shows recent announcements; bb_download saves one "
-        "item's files; bb_sync downloads every current course's PDFs (check bb_sync_status). If any tool reports "
+        "item's files; bb_sync downloads every current course's PDFs, skipping sites that aren't courses and posters, "
+        "handbooks and forms (check bb_sync_status; bb_set_courses changes which courses it pulls). If any tool reports "
         "that sign-in is needed, call bb_login, which opens a browser window for the university sign-in."
     ),
 )
@@ -73,9 +74,41 @@ async def bb_courses(include_all: bool = False) -> list[dict] | dict:
     """List current Blackboard courses (include_all=True: every course and organisation you're enrolled in)."""
     def go():
         bb = _bb()
-        cs = bb.courses(include_organisations=True) if include_all else Syncer(_settings, bb).courses()
+        syncer = Syncer(_settings, bb)
+        current = syncer.courses()
+        _, skipped = syncer.choose(current)
+        why = {s["id"]: s["why"] for s in skipped}
+        now_ids = {c.id for c in current}
+        cs = bb.courses(include_organisations=True) if include_all else current
         return [{"id": c.id, "course_id": c.course_id, "code": c.code, "name": c.name,
-                 "last_accessed": c.last_accessed, "url": c.url} for c in cs]
+                 "last_accessed": c.last_accessed, "url": c.url, "synced": c.id in now_ids and c.id not in why,
+                 "why_not": why.get(c.id) or ("" if c.id in now_ids else "not this year's, or an organisation")}
+                for c in cs]
+    return await _run(go)
+
+
+@mcp.tool()
+async def bb_set_courses(include: list[str] | None = None, exclude: list[str] | None = None) -> dict:
+    """Choose which courses a full bb_sync pulls, overriding its guess. `include`: courses (id, code or name) to
+    pull even though they look like an info site; `exclude`: ones to stop pulling. Saved for every later sync.
+    Passing a course in one list removes it from the other."""
+    def go():
+        import json
+        bb = _bb()
+        syncer = Syncer(_settings, bb)
+        prefs = syncer.prefs()
+        inc, exc = set(prefs.get("include") or []), set(prefs.get("exclude") or [])
+        everything = bb.courses(include_organisations=True)
+        for q in include or []:
+            cid = bb.find_course(q, everything).id
+            inc.add(cid)
+            exc.discard(cid)
+        for q in exclude or []:
+            cid = bb.find_course(q, everything).id
+            exc.add(cid)
+            inc.discard(cid)
+        syncer.prefs_path.write_text(json.dumps({"include": sorted(inc), "exclude": sorted(exc)}, indent=1))
+        return {"ok": True, "include": sorted(inc), "exclude": sorted(exc)}
     return await _run(go)
 
 

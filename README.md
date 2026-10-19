@@ -54,10 +54,16 @@ claude mcp add blackboard -e BB_BASE_URL=https://www.ole.bris.ac.uk -- ~/.local/
 | `bb_upcoming` | Due dates in the next N days (default 21) |
 | `bb_announcements` | Recent announcements, for one course or all of this year's |
 | `bb_sync` / `bb_sync_status` | Download the PDFs from this year's courses (or the ones named), in the background |
+| `bb_set_courses` | Change which courses a full sync pulls (`include` an info site it skips, `exclude` a course) |
 
 **This year's courses:** students stay enrolled in years of old courses, so a sync only takes courses whose end date is
 still ahead, or (as Blackboard rarely sets end dates) that were created within about 9 months of your newest course.
 Files land in `<folder>/<course>/<Week NN or top-level folder>/`, and only new or changed ones are downloaded.
+
+**Only what you study:** a full sync skips sites that aren't courses (faculty hubs, guidance and induction sites,
+library skills) and, inside courses, posters, handbooks, forms, timetables and support pages. Its report lists the
+sites it skipped; `bb_set_courses` brings one back. Words that are also lecture topics only count in an admin phrase,
+so "Mathematical induction" stays and "Induction week schedule" goes ([`relevance.py`](blackboard_mcp/relevance.py)).
 
 ## Connect it to your AI app
 

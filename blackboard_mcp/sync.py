@@ -2,7 +2,8 @@
 
 Layout: <download folder>/<course>/<Week NN or top-level folder>/<file>.pdf. Each file is fetched once: the
 item's "modified" time is remembered, so later syncs only download what's new or changed. Pages that are
-noise for studying (welcome, help, forums, recordings) are skipped.
+noise for studying (welcome, help, forums, recordings) are skipped, and so are sites that aren't courses and files
+that aren't for studying, such as posters, handbooks and forms (relevance.py).
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
+from . import relevance
 from .auth import LoginRequired
 from .bb import Blackboard, Course, body_links, handler_id, parse_dt
 from .config import Settings
@@ -78,8 +80,29 @@ class Syncer:
     def courses(self) -> list[Course]:
         return current_courses(self.bb.courses(), datetime.now(timezone.utc))
 
+    @property
+    def prefs_path(self) -> Path:
+        return self.s.home / "courses.json"
+
+    def prefs(self) -> dict:
+        try:
+            return json.loads(self.prefs_path.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def choose(self, courses: list[Course]) -> tuple[list[Course], list[dict]]:
+        """(courses a full sync pulls, [{id, name, why}] for the ones it skips)."""
+        by_id = {c.id: c for c in courses}
+        keep, skipped = relevance.choose([{"id": c.id, "name": c.name, "shortname": c.course_id,
+                                           "idnumber": c.external_id or ""} for c in courses], self.prefs())
+        return [by_id[k["id"]] for k in keep], [{"id": s["id"], "name": s["name"], "why": s["why"]} for s in skipped]
+
     def run(self, only: list[str] | None = None) -> dict:
-        courses = [self.bb.find_course(q) for q in only] if only else self.courses()
+        passed: list[dict] = []
+        if only:
+            courses = [self.bb.find_course(q) for q in only]
+        else:
+            courses, passed = self.choose(self.courses())
         reports = []
         try:
             for i, c in enumerate(courses, 1):
@@ -93,25 +116,32 @@ class Syncer:
         errors = [f"{r['course']}: {e}" for r in reports for e in r["errors"]]
         where = str(self.s.download_dir).replace(str(Path.home()), "~", 1)
         summary = (f"{new} new PDF{'s' if new != 1 else ''} from {len(courses)} course{'s' if len(courses) != 1 else ''}"
-                   f" into {where}" + (f" ({len(errors)} couldn't be downloaded)" if errors else "") + ".")
+                   f" into {where}" + (f" ({len(errors)} couldn't be downloaded)" if errors else "") + "."
+                   + (f" Skipped {len(passed)} site{'s' if len(passed) != 1 else ''} that aren't courses"
+                      f" ({', '.join(p['name'] for p in passed[:3])}{'…' if len(passed) > 3 else ''})." if passed else ""))
         return {"summary": summary, "folder": str(self.s.download_dir), "downloaded": new, "courses": reports,
-                "errors": errors}
+                "errors": errors, "not_study_files": sum(r.get("not_study", 0) for r in reports),
+                "skipped_courses": passed}
 
     def sync_course(self, c: Course) -> dict:
         root = self.s.download_dir / safe(c.short_name(), 60)
-        downloaded, skipped, errors = [], 0, []
+        downloaded, skipped, errors, noise = [], 0, [], 0
         for trail, item in self.bb.walk(c.id):
             if item.get("title") == DOC_BODY:
                 item, trail = dict(item, title=trail[-1] if trail else "Document"), trail[:-1]
             elif handler_id(item) in FOLDERISH and not item.get("body"):
                 continue
             title = item.get("title") or ""
-            if NOISE.search(title) or any(NOISE.search(t) for t in trail):
+            if NOISE.search(title) or any(NOISE.search(t) for t in trail) or \
+                    not all(relevance.is_study_section(t) for t in trail[:1]):
                 continue
             week = parse_week(title, *reversed(trail))
             folder = root / (f"Week {week:02d}" if week else safe(trail[0], 60) if trail else "Other")
             modified = item.get("modified") or item.get("created") or ""
             for key, name, url in self.files(c, item):
+                if not relevance.is_study_file(name, title, *trail):
+                    noise += 1  # a poster, handbook or form
+                    continue
                 dest = folder / name
                 if self.state["files"].get(key) == modified and dest.exists():
                     skipped += 1
@@ -125,7 +155,7 @@ class Syncer:
                 except Exception as e:  # noqa: BLE001 - report per file, keep going
                     errors.append(f"{name}: {e}")
         return {"course": c.short_name(), "folder": str(root), "downloaded": len(downloaded), "skipped": skipped,
-                "files": downloaded, "errors": errors}
+                "not_study": noise, "files": downloaded, "errors": errors}
 
     def files(self, c: Course, item: dict):
         """(state key, file name, download URL) for each PDF attached to or embedded in an item."""
