@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+[![M8ven Score](https://m8ven.ai/badge/mcp/mattlo0546-blackboard-mcp-w5zm3b?v=ca99a9aef024e25f665f1a7a0cea48a5)](https://m8ven.ai/mcp/mattlo0546-blackboard-mcp-w5zm3b?s=readme)
 
 **blackboard-mcp** is an open-source [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for
 **Blackboard Learn** (Ultra). It lets AI assistants (Claude Desktop, Claude Code, ChatGPT Codex, Cursor, VS Code and
